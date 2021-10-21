@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -17,7 +18,8 @@ import (
 	evmtypes "github.com/tharsis/ethermint/x/evm/types"
 
 	// "github.com/tharsis/evmos/solidity/contracts"
-	"github.com/tharsis/evmos/x/intrarelayer/types"
+	types "github.com/tharsis/evmos/x/intrarelayer/types"
+	"github.com/tharsis/evmos/x/intrarelayer/types/contracts"
 )
 
 var _ types.MsgServer = &Keeper{}
@@ -141,13 +143,10 @@ func (k Keeper) ConvertERC20(goCtx context.Context, msg *types.MsgConvertERC20) 
 
 	contract := pair.GetERC20Contract()
 
-	// TODO: use init to compile ABI
-	// erc20, err := abi.JSON(strings.NewReader(contracts.ContractsABI))
-	// if err != nil {
-	// 	return nil, sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
-	// }
-
-	var erc20 abi.ABI
+	erc20, err := contracts.NewErc20Contract()
+	if err != nil {
+		return nil, sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
+	}
 
 	// pack and burn ERC20
 	payload, err := erc20.Pack(

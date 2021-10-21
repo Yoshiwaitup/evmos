@@ -8,6 +8,8 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/tharsis/evmos/x/intrarelayer/types"
+	"github.com/tharsis/evmos/x/intrarelayer/types/contracts"
+	evmtypes "github.com/tharsis/ethermint/x/evm/types"
 )
 
 // RegisterTokenPair registers token pair by coin denom and ERC20 contract
@@ -48,7 +50,17 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	// if cosmos denom doesn't exist
 	// TODO: query the contract and supply
 
-	// TODO: retrieve from ERC20 contract ABI
+	erc20, err := contracts.NewErc20Contract()
+	if err != nil {
+		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
+	}
+	req := evmtypes.EthCallRequest{
+		Args: ,
+		GasCap: 1000000,
+	}
+	k.evmKeeper.EthCall(ctx, req)
+	a := erc20.getArguments("symbol",[])
+
 	symbol := ""
 	decimals := uint32(18)
 	token := ""

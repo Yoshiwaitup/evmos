@@ -71,7 +71,14 @@ func (suite *KeeperTestSuite) TestTokenPairs() {
 			res, err := suite.queryClient.TokenPairs(ctx, req)
 			if tc.expPass {
 				suite.Require().NoError(err)
-				suite.Require().Equal(expRes, res)
+				// 2 pairs registered wo/pagination token order is not defined for the res object
+				if len(expRes.TokenPairs) == 2 {
+					suite.Require().Equal(expRes.Pagination, res.Pagination)
+					equals := (expRes.TokenPairs[0] == res.TokenPairs[0] && expRes.TokenPairs[1] == res.TokenPairs[1]) || (expRes.TokenPairs[0] == res.TokenPairs[1] && expRes.TokenPairs[1] == res.TokenPairs[0])
+					suite.Require().True(equals)
+				} else {
+					suite.Require().Equal(expRes, res)
+				}
 			} else {
 				suite.Require().Error(err)
 			}
