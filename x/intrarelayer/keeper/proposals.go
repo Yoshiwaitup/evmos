@@ -58,48 +58,30 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
 	}
 
-	// encoded_msg := (hexutil.Bytes)(hexutil.Encode(ctorArgs))
 	encoded_msg := (*hexutil.Bytes)(&ctorArgs)
 
-	// "0x95d89b41"
-	// encoded_msg:=(hexutil.Bytes)([48,120,57,53,100,56,57,98,52,49])
 	if err != nil {
 		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
 	}
-	// &evmtypes.TransactionArgs{
-	// 	From: &suite.address,
-	// 	Data: (*hexutil.Bytes)(&data),
-	// }
 
 	from := types.ModuleAddress
 	to := common.HexToAddress(bridge.Erc20Address)
+	// TODO: get gas price
 	gas := hexutil.Uint64(40000)
-	gasPrice := (*hexutil.Big)(big.NewInt(0)) // 0x55ae82600
+	gasPrice := (*hexutil.Big)(big.NewInt(0))
 
 	args := &evmtypes.TransactionArgs{
 		From:     &from,
 		To:       &to,
-		Gas:      &gas, //hexutils.HexToBytes("0x5208"),hexutil.Uint64(20000)
+		Gas:      &gas,
 		GasPrice: gasPrice,
-		// Value:    "0x16345785d8a0000",
-		Data: encoded_msg, //"0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675",
+		Data:     encoded_msg,
 	}
 
 	bz, err := json.Marshal(&args)
 	if err != nil {
 		return err
 	}
-	// "{\"from\":\"0x0000000000000000000000000000000000000000\",\"to\":\"0xd15e9843708faf93dc0b430fa3ac618773725dba\",\"gas\":\"0x5208\",\"gasPrice\":null,\"maxFeePerGas\":null,\"maxPriorityFeePerGas\":null,\"value\":null,\"nonce\":null,\"data\":\"0x30783935643839623431\",\"input\":null}"
-	// baseFee, err := e.BaseFee()
-	// if err != nil {
-	// 	return 0, err
-	// }
-
-	// var bf *sdk.Int
-	// if baseFee != nil {
-	// 	aux := sdk.NewIntFromBigInt(baseFee)
-	// 	bf = &aux
-	// }
 
 	req := evmtypes.EthCallRequest{
 		Args:   bz,
@@ -115,8 +97,15 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	// contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 	// contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
 	// ret, err = evm.interpreter.Run(contract, input, false)
-	fmt.Print(msg.Ret)
-	symbol := "test"
+	parsed := make(map[string]interface{})
+	erc20.ABI.UnpackIntoMap(parsed, "symbol", msg.Ret)
+	// TODO: validate response and get value without range loop
+	symbol := ""
+	for _, v := range parsed {
+		symbol = fmt.Sprintf("%v", v)
+	}
+
+	// TODO: set this 2 values, token will not be available with the curret erc20 contract
 	decimals := uint32(18)
 	token := "rama"
 
