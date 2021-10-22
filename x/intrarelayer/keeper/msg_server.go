@@ -145,7 +145,7 @@ func (k Keeper) ConvertERC20(goCtx context.Context, msg *types.MsgConvertERC20) 
 
 	contract := pair.GetERC20Contract()
 
-	erc20, err := contracts.NewErc20Contract()
+	erc20 := contracts.ERC20BurnableAndMintableContract.ABI
 	if err != nil {
 		return nil, sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
 	}

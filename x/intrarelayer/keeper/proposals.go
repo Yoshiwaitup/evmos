@@ -52,7 +52,7 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 
 	// if cosmos denom doesn't exist
 	// TODO: query the contract and supply
-	erc20 := contracts.ModuleCRC20Contract
+	erc20 := contracts.ERC20BurnableContract
 	ctorArgs, err := erc20.ABI.Pack("symbol")
 	if err != nil {
 		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
@@ -73,8 +73,8 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	// 	Data: (*hexutil.Bytes)(&data),
 	// }
 
-	from := common.Address{}
-	to := common.HexToAddress(bridge.Erc20Address)
+	from := types.ModuleAddress
+	to := types.ModuleAddress //:= common.HexToAddress(bridge.Erc20Address)
 	gas := hexutil.Uint64(40000)
 	gasPrice := (*hexutil.Big)(big.NewInt(0)) // 0x55ae82600
 
@@ -112,10 +112,13 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	if err != nil {
 		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to send eth_call: %s", err.Error())
 	}
-	_ = msg
-	// a := erc20.getArguments("symbol",[])
 
-	symbol := "rama"
+	// this calls should be enough for getting values
+	// contract := NewContract(caller, AccountRef(addrCopy), value, gas)
+	// contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
+	// ret, err = evm.interpreter.Run(contract, input, false)
+
+	symbol := msg
 	decimals := uint32(18)
 	token := "rama"
 

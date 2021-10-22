@@ -1,18 +1,26 @@
 package keeper_test
 
 import (
+	"encoding/json"
+	"math/big"
 	"testing"
 	"time"
 
+	abci "github.com/tendermint/tendermint/abci/types"
+
+	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/tharsis/ethermint/server/config"
 	ethermint "github.com/tharsis/ethermint/types"
+	evm "github.com/tharsis/ethermint/x/evm/types"
 	feemarkettypes "github.com/tharsis/ethermint/x/feemarket/types"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -27,6 +35,7 @@ import (
 	"github.com/tharsis/ethermint/tests"
 	"github.com/tharsis/evmos/app"
 	"github.com/tharsis/evmos/x/intrarelayer/types"
+	"github.com/tharsis/evmos/x/intrarelayer/types/contracts"
 )
 
 type ProposalTestSuite struct {
@@ -34,7 +43,7 @@ type ProposalTestSuite struct {
 
 	ctx          sdk.Context
 	app          *app.Evmos
-	queryClient  types.QueryClient
+	queryClient  evm.QueryClient
 	dynamicTxFee bool
 
 	address     common.Address
@@ -97,14 +106,9 @@ func (suite *ProposalTestSuite) DoSetupTest(t require.TestingT) {
 	})
 	suite.app.EvmKeeper.WithContext(suite.ctx)
 
-	// queryHelper := baseapp.NewQueryServerTestHelper(suite.ctx, suite.app.InterfaceRegistry())
-	// types.RegisterQueryServer(queryHelper, suite.app.CronKeeper)
-	// suite.queryClient = types.NewQueryClient(queryHelper)
-
-	// // Query helper from ethermint to query the denom
-	// queryHelperEvm := baseapp.NewQueryServerTestHelper(suite.ctx, suite.app.InterfaceRegistry())
-	// evmtypes.RegisterQueryServer(queryHelper, suite.app.EvmKeeper)
-	// suite.queryClientEvm = evmtypes.NewQueryClient(queryHelperEvm)
+	queryHelper := baseapp.NewQueryServerTestHelper(suite.ctx, suite.app.InterfaceRegistry())
+	evm.RegisterQueryServer(queryHelper, suite.app.EvmKeeper)
+	suite.queryClient = evm.NewQueryClient(queryHelper)
 
 	acc := &ethermint.EthAccount{
 		BaseAccount: authtypes.NewBaseAccount(sdk.AccAddress(suite.address.Bytes()), nil, 0, 0),
@@ -113,16 +117,8 @@ func (suite *ProposalTestSuite) DoSetupTest(t require.TestingT) {
 
 	suite.app.AccountKeeper.SetAccount(suite.ctx, acc)
 
-	// Set the sequence as 1 because that's the value that
-	// the acc will have after the antehandler executes
-	account := suite.app.AccountKeeper.GetAccount(suite.ctx, suite.address.Bytes())
-	account.SetSequence(1)
-	suite.app.AccountKeeper.SetAccount(suite.ctx, account)
-
 	valAddr := sdk.ValAddress(suite.address.Bytes())
 	validator, err := stakingtypes.NewValidator(valAddr, priv.PubKey(), stakingtypes.Description{})
-	require.NoError(t, err)
-	err = suite.app.StakingKeeper.SetValidatorByConsAddr(suite.ctx, validator)
 	require.NoError(t, err)
 	err = suite.app.StakingKeeper.SetValidatorByConsAddr(suite.ctx, validator)
 	require.NoError(t, err)
@@ -133,6 +129,18 @@ func (suite *ProposalTestSuite) DoSetupTest(t require.TestingT) {
 	suite.ethSigner = ethtypes.LatestSignerForChainID(suite.app.EvmKeeper.ChainID())
 	// suite.appCodec = encodingConfig.Marshaler
 
+	// TODO: this account should be already in the account keeper after the app constructor
+	// irmAccount := &ethermint.EthAccount{
+	// 	BaseAccount: authtypes.NewBaseAccount(sdk.AccAddress(types.ModuleAddress.Bytes()), nil, 0, 0),
+	// 	CodeHash:    common.BytesToHash(crypto.Keccak256(nil)).String(),
+	// }
+
+	// suite.app.AccountKeeper.SetAccount(suite.ctx, acc)
+	// temp := sdk.AccAddress()
+	// suite.app.AccountKeeper.SetAccount(suite.ctx, irmAccount)
+	suite.app.EvmKeeper.CreateAccount(types.ModuleAddress)
+	suite.app.EvmKeeper.AddAddressToAccessList(types.ModuleAddress)
+
 	suite.Require().NoError(err)
 }
 
@@ -142,11 +150,87 @@ func (suite *ProposalTestSuite) SetupTest() {
 
 func (suite *ProposalTestSuite) TestRegisterTokenPair() {
 	suite.SetupTest()
-	pair := types.NewTokenPair(tests.GenerateAddress(), "ramacoin", true)
+	contractAddr := suite.DeployContract("ramacoin", uint8(18))
+	suite.Commit()
+	pair := types.NewTokenPair(contractAddr, "ramacoin", true)
 	err := suite.app.IntrarelayerKeeper.RegisterTokenPair(suite.ctx, pair)
 	suite.Require().NoError(err)
 }
 
 func TestProposalTestSuite(t *testing.T) {
 	suite.Run(t, new(ProposalTestSuite))
+}
+
+func (suite *ProposalTestSuite) DeployContract(denom string, unit uint8) common.Address {
+	ctx := sdk.WrapSDKContext(suite.ctx)
+	chainID := suite.app.EvmKeeper.ChainID()
+
+	ctorArgs, err := contracts.ERC20BurnableAndMintableContract.ABI.Pack("", denom, unit)
+	suite.Require().NoError(err)
+
+	data := append(contracts.ERC20BurnableAndMintableContract.Bin, ctorArgs...)
+	args, err := json.Marshal(&evm.TransactionArgs{
+		From: &suite.address,
+		Data: (*hexutil.Bytes)(&data),
+	})
+	suite.Require().NoError(err)
+
+	res, err := suite.queryClient.EstimateGas(ctx, &evm.EthCallRequest{
+		Args:   args,
+		GasCap: uint64(config.DefaultGasCap),
+	})
+	suite.Require().NoError(err)
+
+	nonce := suite.app.EvmKeeper.GetNonce(suite.address)
+
+	var erc20DeployTx *evm.MsgEthereumTx
+	if suite.dynamicTxFee {
+		erc20DeployTx = evm.NewTxContract(
+			chainID,
+			nonce,
+			nil,     // amount
+			res.Gas, // gasLimit
+			nil,     // gasPrice
+			suite.app.FeeMarketKeeper.GetBaseFee(suite.ctx),
+			big.NewInt(1),
+			data,                   // input
+			&ethtypes.AccessList{}, // accesses
+		)
+	} else {
+		erc20DeployTx = evm.NewTxContract(
+			chainID,
+			nonce,
+			nil,     // amount
+			res.Gas, // gasLimit
+			nil,     // gasPrice
+			nil, nil,
+			data, // input
+			nil,  // accesses
+		)
+	}
+
+	erc20DeployTx.From = suite.address.Hex()
+	err = erc20DeployTx.Sign(ethtypes.LatestSignerForChainID(chainID), suite.signer)
+	suite.Require().NoError(err)
+	rsp, err := suite.app.EvmKeeper.EthereumTx(ctx, erc20DeployTx)
+	suite.Require().NoError(err)
+	suite.Require().Empty(rsp.VmError)
+	return crypto.CreateAddress(suite.address, nonce)
+}
+
+func (suite *ProposalTestSuite) Commit() {
+	_ = suite.app.Commit()
+	header := suite.ctx.BlockHeader()
+	header.Height += 1
+	suite.app.BeginBlock(abci.RequestBeginBlock{
+		Header: header,
+	})
+
+	// update ctx
+	suite.ctx = suite.app.BaseApp.NewContext(false, header)
+	suite.app.EvmKeeper.WithContext(suite.ctx)
+
+	queryHelper := baseapp.NewQueryServerTestHelper(suite.ctx, suite.app.InterfaceRegistry())
+	evm.RegisterQueryServer(queryHelper, suite.app.EvmKeeper)
+	suite.queryClient = evm.NewQueryClient(queryHelper)
 }
