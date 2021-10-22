@@ -8,6 +8,7 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	evmtypes "github.com/tharsis/ethermint/x/evm/types"
 	"github.com/tharsis/evmos/x/intrarelayer/types"
 	"github.com/tharsis/evmos/x/intrarelayer/types/contracts"
@@ -50,8 +51,18 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 
 	// if cosmos denom doesn't exist
 	// TODO: query the contract and supply
+	erc20, err := contracts.NewErc20Contract()
+	ctorArgs, err := erc20.Pack("symbol")
+	if err != nil {
+		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
+	}
+	// data := append(contracts.ERC20BurnableContract.Bin, ctorArgs...)
+	// if err != nil {
+	// return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create the bin ABI for erc20: %s", err.Error())
+	// }
 
-	_, err := contracts.NewErc20Contract()
+	encoded_msg := (hexutil.Bytes)(hexutil.Encode(ctorArgs))
+
 	if err != nil {
 		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
 	}
@@ -59,13 +70,17 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	// 	From: &suite.address,
 	// 	Data: (*hexutil.Bytes)(&data),
 	// }
+
+	from := common.Address{}
+	to := common.HexToAddress(bridge.Erc20Address)
+	gas := hexutil.Uint64(0x5208)
 	args := &evmtypes.TransactionArgs{
-		From:     "0x3b7252d007059ffc82d16d022da3cbf9992d2f70",
-		To:       "0xddd64b4712f7c8f1ace3c145c950339eddaf221d",
-		Gas:      "0x5208",
-		GasPrice: "0x55ae82600",
-		Value:    "0x16345785d8a0000",
-		Data:     "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675",
+		From: &from,
+		To:   &to,
+		Gas:  &gas, //hexutils.HexToBytes("0x5208"),hexutil.Uint64(20000)
+		// GasPrice: "0x55ae82600",
+		// Value:    "0x16345785d8a0000",
+		Data: &encoded_msg, //"0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675",
 	}
 
 	bz, err := json.Marshal(&args)
@@ -89,12 +104,13 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 		GasCap: 100000,
 	}
 
-	k.evmKeeper.EthCall(ctx.Context(), &req)
+	msg, err := k.evmKeeper.EthCall(ctx.Context(), &req)
+	_ = msg
 	// a := erc20.getArguments("symbol",[])
 
-	symbol := ""
+	symbol := "rama"
 	decimals := uint32(18)
-	token := ""
+	token := "rama"
 
 	// create a bank denom metadata based on the ERC20 token ABI details
 	metadata := banktypes.Metadata{
