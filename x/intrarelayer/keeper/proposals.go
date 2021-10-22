@@ -1,15 +1,16 @@
 package keeper
 
 import (
+	"encoding/json"
 	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/ethereum/go-ethereum/common"
+	evmtypes "github.com/tharsis/ethermint/x/evm/types"
 	"github.com/tharsis/evmos/x/intrarelayer/types"
 	"github.com/tharsis/evmos/x/intrarelayer/types/contracts"
-	evmtypes "github.com/tharsis/ethermint/x/evm/types"
 )
 
 // RegisterTokenPair registers token pair by coin denom and ERC20 contract
@@ -50,16 +51,46 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	// if cosmos denom doesn't exist
 	// TODO: query the contract and supply
 
-	erc20, err := contracts.NewErc20Contract()
+	_, err := contracts.NewErc20Contract()
 	if err != nil {
 		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
 	}
-	req := evmtypes.EthCallRequest{
-		Args: ,
-		GasCap: 1000000,
+	// &evmtypes.TransactionArgs{
+	// 	From: &suite.address,
+	// 	Data: (*hexutil.Bytes)(&data),
+	// }
+	args := &evmtypes.TransactionArgs{
+		From:     "0x3b7252d007059ffc82d16d022da3cbf9992d2f70",
+		To:       "0xddd64b4712f7c8f1ace3c145c950339eddaf221d",
+		Gas:      "0x5208",
+		GasPrice: "0x55ae82600",
+		Value:    "0x16345785d8a0000",
+		Data:     "0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675",
 	}
-	k.evmKeeper.EthCall(ctx, req)
-	a := erc20.getArguments("symbol",[])
+
+	bz, err := json.Marshal(&args)
+	if err != nil {
+		return err
+	}
+
+	// baseFee, err := e.BaseFee()
+	// if err != nil {
+	// 	return 0, err
+	// }
+
+	// var bf *sdk.Int
+	// if baseFee != nil {
+	// 	aux := sdk.NewIntFromBigInt(baseFee)
+	// 	bf = &aux
+	// }
+
+	req := evmtypes.EthCallRequest{
+		Args:   bz,
+		GasCap: 100000,
+	}
+
+	k.evmKeeper.EthCall(ctx.Context(), &req)
+	// a := erc20.getArguments("symbol",[])
 
 	symbol := ""
 	decimals := uint32(18)
