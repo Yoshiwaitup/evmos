@@ -3,6 +3,7 @@ package keeper
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -74,12 +75,14 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 
 	from := common.Address{}
 	to := common.HexToAddress(bridge.Erc20Address)
-	gas := hexutil.Uint64(0x5208)
+	gas := hexutil.Uint64(40000)
+	gasPrice := (*hexutil.Big)(big.NewInt(0)) // 0x55ae82600
+
 	args := &evmtypes.TransactionArgs{
-		From: &from,
-		To:   &to,
-		Gas:  &gas, //hexutils.HexToBytes("0x5208"),hexutil.Uint64(20000)
-		// GasPrice: "0x55ae82600",
+		From:     &from,
+		To:       &to,
+		Gas:      &gas, //hexutils.HexToBytes("0x5208"),hexutil.Uint64(20000)
+		GasPrice: gasPrice,
 		// Value:    "0x16345785d8a0000",
 		Data: &encoded_msg, //"0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675",
 	}
@@ -105,9 +108,11 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 		GasCap: 100000,
 	}
 
-	msg, err := k.evmKeeper.EthCall(k.evmKeeper.Ctx().Context(), &req)
+	msg, err := k.evmKeeper.EthCall(sdk.WrapSDKContext(ctx), &req)
+	if err != nil {
+		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to send eth_call: %s", err.Error())
+	}
 	_ = msg
-	_ = err
 	// a := erc20.getArguments("symbol",[])
 
 	symbol := "rama"
