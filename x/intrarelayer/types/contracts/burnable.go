@@ -1,88 +1,67 @@
 package contracts
 
-// import (
-// 	// embed compiled smart contract
-// 	_ "embed"
-// 	"encoding/hex"
-// 	"encoding/json"
-// 	"fmt"
+import (
+	// embed compiled smart contract
+	_ "embed"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 
-// 	"github.com/ethereum/go-ethereum/accounts/abi"
-// )
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+)
 
-// // HexString is a byte array that serializes to hex
-// type HexString []byte
+// ByteString is a byte array that serializes to hex
+type ByteString []byte
 
-// // MarshalJSON serializes ByteArray to hex
-// func (s HexString) MarshalJSON() ([]byte, error) {
-// 	return json.Marshal(fmt.Sprintf("%x", string(s)))
-// }
+// MarshalJSON serializes ByteArray to hex
+func (s ByteString) MarshalJSON() ([]byte, error) {
+	bytes, err := json.Marshal(fmt.Sprintf("%x", string(s)))
+	return bytes, err
+}
 
-// // UnmarshalJSON deserializes ByteArray to hex
-// func (s *HexString) UnmarshalJSON(data []byte) error {
-// 	var x string
-// 	if err := json.Unmarshal(data, &x); err != nil {
-// 		return err
-// 	}
-// 	str, err := hex.DecodeString(x)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	*s = str
-// 	return nil
-// }
+// UnmarshalJSON deserializes ByteArray to hex
+func (s *ByteString) UnmarshalJSON(data []byte) error {
+	var x string
+	err := json.Unmarshal(data, &x)
+	if err == nil {
+		str, e := hex.DecodeString(x)
+		*s = str
+		err = e
+	}
 
-// // CompiledContract contains compiled bytecode and abi
-// type CompiledContract struct {
-// 	ABI abi.ABI
-// 	Bin HexString
-// }
+	return err
+}
 
-// type jsonCompiledContract struct {
-// 	ABI string
-// 	Bin HexString
-// }
+// CompiledContract contains compiled bytecode and abi
+type CompiledContract struct {
+	ABI abi.ABI
+	Bin ByteString
+}
 
-// // MarshalJSON serializes ByteArray to hex
-// func (s CompiledContract) MarshalJSON() ([]byte, error) {
-// 	abi1, err := json.Marshal(s.ABI)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return json.Marshal(jsonCompiledContract{ABI: string(abi1), Bin: s.Bin})
-// }
+const EVMModuleName = "cronos-evm"
 
-// // UnmarshalJSON deserializes ByteArray to hex
-// func (s *CompiledContract) UnmarshalJSON(data []byte) error {
-// 	var x jsonCompiledContract
-// 	if err := json.Unmarshal(data, &x); err != nil {
-// 		return err
-// 	}
+var (
+	//go:embed ERC20Burnable.json
+	cronosCRC20JSON []byte
 
-// 	s.Bin = x.Bin
-// 	if err := json.Unmarshal([]byte(x.ABI), &s.ABI); err != nil {
-// 		fmt.Println("unmarshal abi fail", x.ABI, string(data))
-// 		return err
-// 	}
+	// ModuleCRC20Contract is the compiled cronos erc20 contract
+	ModuleCRC20Contract CompiledContract
 
-// 	return nil
-// }
+	// EVMModuleAddress is the native module address for EVM
+	EVMModuleAddress common.Address
+)
 
-// var (
-// 	//go:embed ERC20Burnable.json
-// 	erc20BurnableJSON []byte
+func init() {
+	EVMModuleAddress = common.BytesToAddress(authtypes.NewModuleAddress(EVMModuleName).Bytes())
 
-// 	// ERC20Contract is the compiled test erc20 contract
-// 	ERC20BurnableContract CompiledContract
-// )
+	err := json.Unmarshal(cronosCRC20JSON, &ModuleCRC20Contract)
+	if err != nil {
+		panic(err)
+	}
 
-// func init() {
-// 	err := json.Unmarshal(erc20BurnableJSON, &ERC20BurnableContract)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-
-// 	if len(ERC20BurnableContract.Bin) == 0 {
-// 		panic("load contract failed")
-// 	}
-// }
+	// if len(ModuleCRC20Contract.Bin) == 0 {
+	// 	panic("load contract failed")
+	// }
+}

@@ -51,8 +51,8 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 
 	// if cosmos denom doesn't exist
 	// TODO: query the contract and supply
-	erc20, err := contracts.NewErc20Contract()
-	ctorArgs, err := erc20.Pack("symbol")
+	erc20 := contracts.ModuleCRC20Contract
+	ctorArgs, err := erc20.ABI.Pack("symbol")
 	if err != nil {
 		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
 	}
@@ -62,7 +62,8 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	// }
 
 	encoded_msg := (hexutil.Bytes)(hexutil.Encode(ctorArgs))
-
+	// "0x95d89b41"
+	// encoded_msg:=(hexutil.Bytes)([48,120,57,53,100,56,57,98,52,49])
 	if err != nil {
 		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
 	}
@@ -87,7 +88,7 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	if err != nil {
 		return err
 	}
-
+	// "{\"from\":\"0x0000000000000000000000000000000000000000\",\"to\":\"0xd15e9843708faf93dc0b430fa3ac618773725dba\",\"gas\":\"0x5208\",\"gasPrice\":null,\"maxFeePerGas\":null,\"maxPriorityFeePerGas\":null,\"value\":null,\"nonce\":null,\"data\":\"0x30783935643839623431\",\"input\":null}"
 	// baseFee, err := e.BaseFee()
 	// if err != nil {
 	// 	return 0, err
@@ -104,8 +105,9 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 		GasCap: 100000,
 	}
 
-	msg, err := k.evmKeeper.EthCall(ctx.Context(), &req)
+	msg, err := k.evmKeeper.EthCall(k.evmKeeper.Ctx().Context(), &req)
 	_ = msg
+	_ = err
 	// a := erc20.getArguments("symbol",[])
 
 	symbol := "rama"
