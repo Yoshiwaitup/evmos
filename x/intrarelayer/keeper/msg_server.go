@@ -80,6 +80,8 @@ func (k Keeper) ConvertCoin(goCtx context.Context, msg *types.MsgConvertCoin) (*
 		big.NewInt(0),        // amount
 		config.DefaultGasCap, // gasLimit
 		big.NewInt(0),        // gasPrice
+		big.NewInt(0),        // gasFeeCap
+		big.NewInt(0),        // gasTipCap
 		payload,
 		ethtypes.AccessList{}, // AccessList
 		false,                 // checkNonce
@@ -172,6 +174,8 @@ func (k Keeper) ConvertERC20(goCtx context.Context, msg *types.MsgConvertERC20) 
 		big.NewInt(0),        // amount
 		config.DefaultGasCap, // gasLimit
 		big.NewInt(0),        // gasPrice
+		big.NewInt(0),        // gasFeeCap
+		big.NewInt(0),        // gasTipCap
 		payload,
 		ethtypes.AccessList{}, // AccessList
 		true,                  // checkNonce
