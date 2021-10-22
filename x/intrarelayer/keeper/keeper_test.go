@@ -12,6 +12,7 @@ import (
 	tmversion "github.com/tendermint/tendermint/proto/tendermint/version"
 	"github.com/tendermint/tendermint/version"
 
+	feemarkettypes "github.com/tharsis/ethermint/x/feemarket/types"
 	"github.com/tharsis/evmos/app"
 	"github.com/tharsis/evmos/x/intrarelayer/types"
 )
@@ -19,15 +20,25 @@ import (
 type KeeperTestSuite struct {
 	suite.Suite
 
-	ctx         sdk.Context
-	app         *app.Evmos
-	queryClient types.QueryClient
+	ctx          sdk.Context
+	app          *app.Evmos
+	queryClient  types.QueryClient
+	dynamicTxFee bool
 }
 
 func (suite *KeeperTestSuite) SetupTest() {
 	checkTx := false
 
-	suite.app = app.Setup(false)
+	if suite.dynamicTxFee {
+		// setup feemarketGenesis params
+		feemarketGenesis := feemarkettypes.DefaultGenesisState()
+		feemarketGenesis.Params.EnableHeight = 1
+		feemarketGenesis.Params.NoBaseFee = false
+		feemarketGenesis.BaseFee = sdk.NewInt(feemarketGenesis.Params.InitialBaseFee)
+		suite.app = app.Setup(checkTx, feemarketGenesis)
+	} else {
+		suite.app = app.Setup(checkTx, nil)
+	}
 	suite.ctx = suite.app.BaseApp.NewContext(checkTx, tmproto.Header{
 		Height:  1,
 		ChainID: "evmos_9000-1",
