@@ -57,12 +57,10 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	if err != nil {
 		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
 	}
-	// data := append(contracts.ERC20BurnableContract.Bin, ctorArgs...)
-	// if err != nil {
-	// return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create the bin ABI for erc20: %s", err.Error())
-	// }
 
-	encoded_msg := (hexutil.Bytes)(hexutil.Encode(ctorArgs))
+	// encoded_msg := (hexutil.Bytes)(hexutil.Encode(ctorArgs))
+	encoded_msg := (*hexutil.Bytes)(&ctorArgs)
+
 	// "0x95d89b41"
 	// encoded_msg:=(hexutil.Bytes)([48,120,57,53,100,56,57,98,52,49])
 	if err != nil {
@@ -74,7 +72,7 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	// }
 
 	from := types.ModuleAddress
-	to := types.ModuleAddress //:= common.HexToAddress(bridge.Erc20Address)
+	to := common.HexToAddress(bridge.Erc20Address)
 	gas := hexutil.Uint64(40000)
 	gasPrice := (*hexutil.Big)(big.NewInt(0)) // 0x55ae82600
 
@@ -84,7 +82,7 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 		Gas:      &gas, //hexutils.HexToBytes("0x5208"),hexutil.Uint64(20000)
 		GasPrice: gasPrice,
 		// Value:    "0x16345785d8a0000",
-		Data: &encoded_msg, //"0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675",
+		Data: encoded_msg, //"0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675",
 	}
 
 	bz, err := json.Marshal(&args)
@@ -117,8 +115,8 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	// contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 	// contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
 	// ret, err = evm.interpreter.Run(contract, input, false)
-
-	symbol := msg
+	fmt.Print(msg.Ret)
+	symbol := "test"
 	decimals := uint32(18)
 	token := "rama"
 
