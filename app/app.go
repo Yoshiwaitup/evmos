@@ -103,6 +103,9 @@ import (
 	evmkeeper "github.com/tharsis/ethermint/x/evm/keeper"
 	evmtypes "github.com/tharsis/ethermint/x/evm/types"
 
+	"github.com/tharsis/ethermint/x/feemarket"
+	feemarketkeeper "github.com/tharsis/ethermint/x/feemarket/keeper"
+	feemarkettypes "github.com/tharsis/ethermint/x/feemarket/types"
 	"github.com/tharsis/evmos/x/intrarelayer"
 	irk "github.com/tharsis/evmos/x/intrarelayer/keeper"
 	irt "github.com/tharsis/evmos/x/intrarelayer/types"
@@ -217,7 +220,8 @@ type Evmos struct {
 	ScopedTransferKeeper capabilitykeeper.ScopedKeeper
 
 	// Ethermint keepers
-	EvmKeeper *evmkeeper.Keeper
+	EvmKeeper       *evmkeeper.Keeper
+	FeeMarketKeeper feemarketkeeper.Keeper
 
 	// Evmos keepers
 	IntrarelayerKeeper irk.Keeper
@@ -271,8 +275,8 @@ func NewEvmos(
 		// ibc keys
 		ibchost.StoreKey, ibctransfertypes.StoreKey,
 		// ethermint keys
-		evmtypes.StoreKey,
-		// evmos keys
+		evmtypes.StoreKey, feemarkettypes.StoreKey,
+		// Evmos keys
 		irt.StoreKey,
 	)
 
@@ -344,9 +348,14 @@ func NewEvmos(
 	tracer := cast.ToString(appOpts.Get(srvflags.EVMTracer))
 
 	// Create Ethermint keepers
+	app.FeeMarketKeeper = feemarketkeeper.NewKeeper(
+		appCodec, keys[feemarkettypes.StoreKey], app.GetSubspace(feemarkettypes.ModuleName),
+	)
+
+	// Create Ethermint keepers
 	app.EvmKeeper = evmkeeper.NewKeeper(
 		appCodec, keys[evmtypes.StoreKey], tkeys[evmtypes.TransientKey], app.GetSubspace(evmtypes.ModuleName),
-		app.AccountKeeper, app.BankKeeper, app.StakingKeeper,
+		app.AccountKeeper, app.BankKeeper, app.StakingKeeper, app.FeeMarketKeeper,
 		tracer, bApp.Trace(), // debug EVM based on Baseapp options
 	)
 
@@ -437,6 +446,7 @@ func NewEvmos(
 		transferModule,
 		// Ethermint app modules
 		evm.NewAppModule(app.EvmKeeper, app.AccountKeeper),
+		feemarket.NewAppModule(app.FeeMarketKeeper),
 		// Evmos app modules
 		intrarelayer.NewAppModule(app.IntrarelayerKeeper),
 	)
@@ -456,7 +466,7 @@ func NewEvmos(
 	)
 	app.mm.SetOrderEndBlockers(
 		crisistypes.ModuleName, govtypes.ModuleName, stakingtypes.ModuleName,
-		evmtypes.ModuleName,
+		evmtypes.ModuleName, feemarkettypes.ModuleName,
 	)
 
 	// NOTE: The genutils module must occur after staking so that pools are
@@ -471,7 +481,7 @@ func NewEvmos(
 		ibchost.ModuleName, genutiltypes.ModuleName, evidencetypes.ModuleName, ibctransfertypes.ModuleName,
 		authz.ModuleName, feegrant.ModuleName,
 		// Ethermint modules
-		evmtypes.ModuleName,
+		evmtypes.ModuleName, feemarkettypes.ModuleName,
 		// Evmos modules
 		irt.ModuleName,
 		// NOTE: crisis module must go at the end to check for invariants on each module
@@ -522,6 +532,7 @@ func NewEvmos(
 	app.SetAnteHandler(
 		ante.NewAnteHandler(
 			app.AccountKeeper, app.BankKeeper, app.EvmKeeper, app.FeeGrantKeeper, app.IBCKeeper.ChannelKeeper,
+			app.FeeMarketKeeper,
 			encodingConfig.TxConfig.SignModeHandler(),
 		),
 	)
@@ -714,6 +725,7 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(ibchost.ModuleName)
 	// ethermint subspaces
 	paramsKeeper.Subspace(evmtypes.ModuleName)
+	paramsKeeper.Subspace(feemarkettypes.ModuleName)
 	// evmos subspaces
 	paramsKeeper.Subspace(irt.ModuleName)
 	return paramsKeeper
