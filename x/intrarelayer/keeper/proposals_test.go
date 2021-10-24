@@ -40,19 +40,15 @@ import (
 
 type ProposalTestSuite struct {
 	suite.Suite
-
 	ctx          sdk.Context
 	app          *app.Evmos
 	queryClient  evm.QueryClient
 	dynamicTxFee bool
-
-	address     common.Address
-	consAddress sdk.ConsAddress
-	// for generate test tx
-	clientCtx client.Context
-	ethSigner ethtypes.Signer
-	// appCodec  codec.Codec
-	signer keyring.Signer
+	address      common.Address
+	consAddress  sdk.ConsAddress
+	clientCtx    client.Context
+	ethSigner    ethtypes.Signer
+	signer       keyring.Signer
 }
 
 func (suite *ProposalTestSuite) DoSetupTest(t require.TestingT) {
@@ -127,17 +123,7 @@ func (suite *ProposalTestSuite) DoSetupTest(t require.TestingT) {
 	encodingConfig := encoding.MakeConfig(app.ModuleBasics)
 	suite.clientCtx = client.Context{}.WithTxConfig(encodingConfig.TxConfig)
 	suite.ethSigner = ethtypes.LatestSignerForChainID(suite.app.EvmKeeper.ChainID())
-	// suite.appCodec = encodingConfig.Marshaler
 
-	// TODO: this account should be already in the account keeper after the app constructor
-	// irmAccount := &ethermint.EthAccount{
-	// 	BaseAccount: authtypes.NewBaseAccount(sdk.AccAddress(types.ModuleAddress.Bytes()), nil, 0, 0),
-	// 	CodeHash:    common.BytesToHash(crypto.Keccak256(nil)).String(),
-	// }
-
-	// suite.app.AccountKeeper.SetAccount(suite.ctx, acc)
-	// temp := sdk.AccAddress()
-	// suite.app.AccountKeeper.SetAccount(suite.ctx, irmAccount)
 	suite.app.EvmKeeper.CreateAccount(types.ModuleAddress)
 	suite.app.EvmKeeper.AddAddressToAccessList(types.ModuleAddress)
 
@@ -152,15 +138,17 @@ func (suite *ProposalTestSuite) TestRegisterTokenPair() {
 	suite.SetupTest()
 	contractAddr := suite.DeployContract("ramacoin", uint8(18))
 	suite.Commit()
-	pair := types.NewTokenPair(contractAddr, "ramacoin", true)
+	pair := types.NewTokenPair(contractAddr, "ramacoinevm", true)
 	err := suite.app.IntrarelayerKeeper.RegisterTokenPair(suite.ctx, pair)
 	suite.Require().NoError(err)
+	// TODO: check in the banking module if the Denom was created
 }
 
 func TestProposalTestSuite(t *testing.T) {
 	suite.Run(t, new(ProposalTestSuite))
 }
 
+// TODO(guille): move this function to a testing suite for everything irm related
 func (suite *ProposalTestSuite) DeployContract(denom string, unit uint8) common.Address {
 	ctx := sdk.WrapSDKContext(suite.ctx)
 	chainID := suite.app.EvmKeeper.ChainID()
@@ -218,6 +206,7 @@ func (suite *ProposalTestSuite) DeployContract(denom string, unit uint8) common.
 	return crypto.CreateAddress(suite.address, nonce)
 }
 
+// TODO(guille): move this function to a testing suite for everything irm related
 func (suite *ProposalTestSuite) Commit() {
 	_ = suite.app.Commit()
 	header := suite.ctx.BlockHeader()

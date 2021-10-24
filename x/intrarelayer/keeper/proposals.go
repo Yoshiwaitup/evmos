@@ -1,16 +1,12 @@
 package keeper
 
 import (
-	"encoding/json"
 	"fmt"
-	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	evmtypes "github.com/tharsis/ethermint/x/evm/types"
 	"github.com/tharsis/evmos/x/intrarelayer/types"
 	"github.com/tharsis/evmos/x/intrarelayer/types/contracts"
 )
@@ -50,69 +46,27 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 		return nil
 	}
 
-	// if cosmos denom doesn't exist
-	// TODO: query the contract and supply
-	erc20 := contracts.ERC20BurnableContract
-	ctorArgs, err := erc20.ABI.Pack("symbol")
+	ret, err := contracts.GetERC20Property(k.evmKeeper, ctx, common.HexToAddress(bridge.Erc20Address), "symbol")
 	if err != nil {
-		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
+		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to get symbol: %s", err.Error())
 	}
+	symbol := ret.(string)
 
-	encoded_msg := (*hexutil.Bytes)(&ctorArgs)
-
+	ret, err = contracts.GetERC20Property(k.evmKeeper, ctx, common.HexToAddress(bridge.Erc20Address), "decimals")
 	if err != nil {
-		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to create ABI for erc20: %s", err.Error())
+		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to get symbol: %s", err.Error())
 	}
+	decimals := uint32(ret.(uint8))
 
-	from := types.ModuleAddress
-	to := common.HexToAddress(bridge.Erc20Address)
-	// TODO: get gas price
-	gas := hexutil.Uint64(40000)
-	gasPrice := (*hexutil.Big)(big.NewInt(0))
-
-	args := &evmtypes.TransactionArgs{
-		From:     &from,
-		To:       &to,
-		Gas:      &gas,
-		GasPrice: gasPrice,
-		Data:     encoded_msg,
-	}
-
-	bz, err := json.Marshal(&args)
-	if err != nil {
-		return err
-	}
-
-	req := evmtypes.EthCallRequest{
-		Args:   bz,
-		GasCap: 100000,
-	}
-
-	msg, err := k.evmKeeper.EthCall(sdk.WrapSDKContext(ctx), &req)
-	if err != nil {
-		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to send eth_call: %s", err.Error())
-	}
-
-	// this calls should be enough for getting values
-	// contract := NewContract(caller, AccountRef(addrCopy), value, gas)
-	// contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
-	// ret, err = evm.interpreter.Run(contract, input, false)
-	parsed := make(map[string]interface{})
-	erc20.ABI.UnpackIntoMap(parsed, "symbol", msg.Ret)
-	// TODO: validate response and get value without range loop
-	symbol := ""
-	for _, v := range parsed {
-		symbol = fmt.Sprintf("%v", v)
-	}
-
-	// TODO: set this 2 values, token will not be available with the curret erc20 contract
-	decimals := uint32(18)
-	token := "rama"
+	// TODO(guille): token name is missing on both ABI
+	token := fmt.Sprintf("t%s", symbol)
 
 	// create a bank denom metadata based on the ERC20 token ABI details
 	metadata := banktypes.Metadata{
 		Description: fmt.Sprintf("Cosmos coin token wrapper of %s ", token),
-		Base:        bridge.Denom,
+		// TODO: is this the correct value for the Display?
+		Display: token,
+		Base:    bridge.Denom,
 		// NOTE: Denom units MUST be increasing
 		DenomUnits: []*banktypes.DenomUnit{
 			{
