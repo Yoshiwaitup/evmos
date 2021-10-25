@@ -58,15 +58,20 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 	}
 	decimals := uint32(ret.(uint8))
 
+	ret, err = contracts.GetERC20Property(k.evmKeeper, ctx, common.HexToAddress(bridge.Erc20Address), "name")
+	if err != nil {
+		return sdkerrors.Wrapf(sdkerrors.ErrJSONUnmarshal, "failed to get symbol: %s", err.Error())
+	}
+
+	name := ret.(string)
+
 	// TODO(guille): token name is missing on both ABI
 	token := fmt.Sprintf("t%s", symbol)
 
 	// create a bank denom metadata based on the ERC20 token ABI details
 	metadata := banktypes.Metadata{
 		Description: fmt.Sprintf("Cosmos coin token wrapper of %s ", token),
-		// TODO: is this the correct value for the Display?
-		Display: token,
-		Base:    bridge.Denom,
+		Base:        bridge.Denom,
 		// NOTE: Denom units MUST be increasing
 		DenomUnits: []*banktypes.DenomUnit{
 			{
@@ -78,8 +83,9 @@ func (k Keeper) CreateMetadata(ctx sdk.Context, bridge types.TokenPair) error {
 				Exponent: decimals,
 			},
 		},
-		Name:   token,
-		Symbol: symbol,
+		Name:    name,
+		Symbol:  symbol,
+		Display: token,
 	}
 
 	if err := metadata.Validate(); err != nil {

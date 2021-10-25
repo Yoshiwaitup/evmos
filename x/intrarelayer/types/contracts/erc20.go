@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	//go:embed ERC20BurnableAndMintable.json
+	//go:embed ERC20PresentMinterPauser.json
 	ERC20BurnableAndMintableJSON []byte
 
 	// ModuleCRC20Contract is the compiled cronos erc20 contract

@@ -153,7 +153,7 @@ func (suite *ProposalTestSuite) DeployContract(denom string, unit uint8) common.
 	ctx := sdk.WrapSDKContext(suite.ctx)
 	chainID := suite.app.EvmKeeper.ChainID()
 
-	ctorArgs, err := contracts.ERC20BurnableAndMintableContract.ABI.Pack("", denom, unit)
+	ctorArgs, err := contracts.ERC20BurnableAndMintableContract.ABI.Pack("", "ramacoin", "rcn")
 	suite.Require().NoError(err)
 
 	data := append(contracts.ERC20BurnableAndMintableContract.Bin, ctorArgs...)
